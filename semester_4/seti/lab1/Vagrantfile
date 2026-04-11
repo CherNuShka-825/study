@@ -1,0 +1,84 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+DISK_PATH = File.join(Dir.pwd, "disks")
+Vagrant.configure("2") do |config|
+config.vm.box = "debian/bookworm64"
+# config.vm.box_version = "12.20250126.1"
+config.vm.provider "virtualbox" do |vb|
+vb.memory = "2048"
+# 3 × 2 GB = 6 GB; оставляем 2 GB ОС хоста
+vb.cpus = 2
+# 2 vCPU — нужно для корректной работы failover поднагрузкой
+vb.linked_clone = true
+vb.customize ["modifyvm", :id, "--hwvirtex", "on"]
+vb.customize ["modifyvm", :id, "--nested-paging", "on"]
+end
+config.vm.provision "shell", inline: <<-SHELL
+cat > /etc/hosts << EOF
+127.0.0.1 localhost
+192.168.56.11 node1.cluster.local node1
+192.168.56.12 node2.cluster.local node2
+192.168.56.13 node3.cluster.local node3
+EOF
+SHELL
+config.vm.provision "shell", path: "scripts/bootstrap.sh"
+# ── Нода 1──────────────────────────────────────────────────────────────────
+config.vm.define "node1" do |node|
+node.vm.hostname = "node1"
+node.vm.network "private_network", ip: "192.168.56.11"
+node.vm.network "private_network", ip: "10.0.0.11"
+node.vm.provider "virtualbox" do |vb|
+vb.name = "highload-node1"
+# Резервный линк Knet
+#vb.customize ["modifyvm", :id, "--nic3", "hostonly"]
+#vb.customize ["modifyvm", :id, "--hostonlyadapter3", "vboxnet1"]
+# Диски для MinIO Distributed
+["node1-disk1.vdi", "node1-disk2.vdi"].each_with_index do |name, i|
+disk = File.join(DISK_PATH, name)
+vb.customize ["createhd", "--filename", disk, "--size", "2048"] unless File.exist?(disk)
+vb.customize ["storageattach", :id,
+"--storagectl", "SATA Controller",
+"--port", (i + 1).to_s, "--device", "0",
+"--type", "hdd", "--medium", disk]
+end
+end
+end
+# ── Нода 2──────────────────────────────────────────────────────────────────
+config.vm.define "node2" do |node|
+node.vm.hostname = "node2"
+node.vm.network "private_network", ip: "192.168.56.12"
+node.vm.network "private_network", ip: "10.0.0.12"
+node.vm.provider "virtualbox" do |vb|
+vb.name = "highload-node2"
+#vb.customize ["modifyvm", :id, "--nic3", "hostonly"]
+#vb.customize ["modifyvm", :id, "--hostonlyadapter3", "vboxnet1"]
+["node2-disk1.vdi", "node2-disk2.vdi"].each_with_index do |name, i|
+disk = File.join(DISK_PATH, name)
+vb.customize ["createhd", "--filename", disk, "--size", "2048"] unless File.exist?(disk)
+vb.customize ["storageattach", :id,
+"--storagectl", "SATA Controller",
+"--port", (i + 1).to_s, "--device", "0",
+"--type", "hdd", "--medium", disk]
+end
+end
+end
+# ── Нода 3──────────────────────────────────────────────────────────────────
+config.vm.define "node3" do |node|
+node.vm.hostname = "node3"
+node.vm.network "private_network", ip: "192.168.56.13"
+node.vm.network "private_network", ip: "10.0.0.13"
+node.vm.provider "virtualbox" do |vb|
+vb.name = "highload-node3"
+#vb.customize ["modifyvm", :id, "--nic3", "hostonly"]
+#vb.customize ["modifyvm", :id, "--hostonlyadapter3", "vboxnet1"]
+["node3-disk1.vdi", "node3-disk2.vdi"].each_with_index do |name, i|
+disk = File.join(DISK_PATH, name)
+vb.customize ["createhd", "--filename", disk, "--size", "2048"] unless File.exist?(disk)
+vb.customize ["storageattach", :id,
+"--storagectl", "SATA Controller",
+"--port", (i + 1).to_s, "--device", "0",
+"--type", "hdd", "--medium", disk]
+end
+end
+end
+end

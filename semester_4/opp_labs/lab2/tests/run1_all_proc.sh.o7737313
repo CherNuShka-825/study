@@ -1,0 +1,50 @@
+=== OpenMP variant 1 ===
+cn203.hpc.nusc.ru
+Threads = 1
+Run 1: 43.4047701010 sec
+Run 2: 43.1431380030 sec
+Run 3: 43.3845462350 sec
+MIN time (1 threads) = 43.1431380030 sec
+
+Threads = 2
+Run 1: 25.0494486760 sec
+Run 2: 24.4496011650 sec
+Run 3: 24.6107522470 sec
+MIN time (2 threads) = 24.4496011650 sec
+
+Threads = 3
+Run 1: 18.6670442240 sec
+Run 2: 18.2807695050 sec
+Run 3: 18.6215033900 sec
+MIN time (3 threads) = 18.2807695050 sec
+
+Threads = 4
+Run 1: 15.4440100930 sec
+Run 2: 16.2016326940 sec
+Run 3: 15.8419487010 sec
+MIN time (4 threads) = 15.4440100930 sec
+
+Threads = 5
+Run 1: 14.7013090360 sec
+Run 2: 14.4227654710 sec
+Run 3: 14.3622679470 sec
+MIN time (5 threads) = 14.3622679470 sec
+
+Threads = 6
+Run 1: 13.0214438560 sec
+Run 2: 15.5300486580 sec
+Run 3: 14.3327039780 sec
+MIN time (6 threads) = 13.0214438560 sec
+
+Threads = 7
+Run 1: 13.5065510660 sec
+Run 2: 12.6923223430 sec
+Run 3: 12.9752952980 sec
+MIN time (7 threads) = 12.6923223430 sec
+
+Threads = 8
+Run 1: 13.0123050630 sec
+Run 2: 12.2543419830 sec
+Run 3: 13.2912452060 sec
+MIN time (8 threads) = 12.2543419830 sec
+

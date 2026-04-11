@@ -1,0 +1,71 @@
+
+ bal dragon
+  bal bal dragon
+
+  11 11
+ 11 11 fa1
+12fallere825
+
+//struct word_degree {
+//    std::string word;
+//    unsigned long long count;
+//};
+//
+//void fill_map(std::map<std::string, unsigned long long>& words, std::ifstream& file_in) {
+//    std::string line;
+//    while (getline(file_in, line)) {
+//        std::string word = "";
+//        for (int i = 0; i <= line.length(); i++) {
+//            if (isalnum(line[i])) {
+//                word += line[i];
+//            } else {
+//                if (word != ""){
+//                    if (words.find(word) == words.end()) {
+//                        words[word] = 1;
+//                    } else {
+//                        words[word] += 1;
+//                    }
+//                    word = "";
+//                }
+//            }
+//        }
+//    }
+//}
+//
+//void fill_vector(std::vector<word_degree>& vector_words, std::ifstream& file_in) {
+//    using namespace std;
+//    map<string, unsigned long long> words;
+//    fill_map(words, file_in);
+//    for (auto& [key, value] : words) {
+//        word_degree a;
+//        a.word = key;
+//        a.count = value;
+//        vector_words.push_back(a);
+//    }
+//}
+//
+//bool comp(word_degree a, word_degree b) {
+//    if (a.count > b.count) return true;
+//    else return false;
+//}
+//
+//unsigned long long counting_words(std::vector<word_degree>& vector_words) {
+//    unsigned long long sum = 0;
+//    for (int i = 0; i < vector_words.size(); i++) {
+//        sum += vector_words[i].count;
+//    }
+//    return sum;
+//}
+//
+//void fill_csv(std::ifstream& file_in, std::ofstream& file_out) {
+//    using namespace std;
+//    vector<word_degree> vector_words;
+//    fill_vector(vector_words, file_in);
+//    sort(vector_words.begin(), vector_words.end(), comp);
+//    unsigned long long quantity_words = counting_words(vector_words);
+//    double freq;
+//    for (int i = 0; i < vector_words.size(); i++) {
+//        freq = double(vector_words[i].count) / quantity_words;
+//        file_out << vector_words[i].word << ";" << vector_words[i].count << ";" << freq << endl;
+//    }
+//}

@@ -1,0 +1,9 @@
+Life 1.06
+#N Mixed Demo Universe
+#R B2S
+10 10
+11 10
+10 11
+12 11
+11 12
+30 30

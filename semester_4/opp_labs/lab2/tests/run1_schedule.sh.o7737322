@@ -1,0 +1,32 @@
+=== OpenMP schedule test 1 ===
+cn203.hpc.nusc.ru
+Schedule = static
+Run 1: 23.8610765920 sec
+Run 2: 23.2208534720 sec
+Run 3: 23.4135552830 sec
+MIN time (schedule=static) = 23.2208534720 sec
+
+Schedule = dynamic,1
+Run 1: 30.3810455910 sec
+Run 2: 26.6681271620 sec
+Run 3: 25.2170321590 sec
+MIN time (schedule=dynamic,1) = 25.2170321590 sec
+
+Schedule = dynamic,10
+Run 1: 21.2712913940 sec
+Run 2: 21.8547043580 sec
+Run 3: 21.5553828970 sec
+MIN time (schedule=dynamic,10) = 21.2712913940 sec
+
+Schedule = guided
+Run 1: 22.2677596990 sec
+Run 2: 26.9034248770 sec
+Run 3: 26.5206061980 sec
+MIN time (schedule=guided) = 22.2677596990 sec
+
+Schedule = guided,10
+Run 1: 24.5346615580 sec
+Run 2: 24.1493020210 sec
+Run 3: 20.1663391200 sec
+MIN time (schedule=guided,10) = 20.1663391200 sec
+

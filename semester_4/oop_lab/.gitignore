@@ -1,0 +1,41 @@
+# IntelliJ IDEA
+.idea/
+*.iml
+out/
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+target/
+build/
+
+# Maven
+.mvn/
+!mvnw.cmd
+
+# Gradle
+.gradle/
+build/
+
+# Kotlin
+.kotlin/
+
+# Logs
+*.log
+
+# OS (Windows)
+Thumbs.db
+Desktop.ini
+
+# Mac
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Temporary files
+*.tmp
+*.swp
+*.bak

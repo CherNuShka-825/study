@@ -1,4 +1,4 @@
-#include <mpi.h>
+#include <mpi/mpi.h>
 #include <vector>
 #include <iostream>
 #include <iomanip>
@@ -32,11 +32,12 @@ void createGrid(MPI_Comm& gridComm, MPI_Comm& rowComm, MPI_Comm& colComm,
 
     p1 = dims[0];
     p2 = dims[1];
-    x = coords[0];
-    y = coords[1];
 
-    MPI_Comm_split(gridComm, x, y, &rowComm);
-    MPI_Comm_split(gridComm, y, x, &colComm);
+    y = coords[0];
+    x = coords[1];
+
+    MPI_Comm_split(gridComm, y, x, &rowComm);
+    MPI_Comm_split(gridComm, x, y, &colComm);
 }
 
 bool checkSizes(int N, int p1, int p2, int rank) {
@@ -54,8 +55,8 @@ void scatterA(const std::vector<double>& A, std::vector<double>& ARow,
               MPI_Comm gridComm, int x, int y) {
     MPI_Comm col0Comm = MPI_COMM_NULL;
 
-    if (y == 0) {
-        MPI_Comm_split(gridComm, 0, x, &col0Comm);
+    if (x == 0) {
+        MPI_Comm_split(gridComm, 0, y, &col0Comm);
 
         const double* sendBuf = A.empty() ? nullptr : A.data();
 
@@ -77,8 +78,8 @@ void scatterB(const std::vector<double>& B, std::vector<double>& BCol,
               MPI_Comm gridComm, int x, int y) {
     MPI_Comm row0Comm = MPI_COMM_NULL;
 
-    if (x == 0) {
-        MPI_Comm_split(gridComm, 0, y, &row0Comm);
+    if (y == 0) {
+        MPI_Comm_split(gridComm, 0, x, &row0Comm);
 
         MPI_Datatype stripeType;
         MPI_Type_vector(N,
@@ -154,9 +155,9 @@ void gatherC(std::vector<double>& C, const std::vector<double>& Cloc,
 
         std::vector<double> tmp(localRows * localCols);
 
-        for (int rx = 0; rx < p1; ++rx) {
-            for (int cy = 0; cy < p2; ++cy) {
-                int srcCoords[2] = {rx, cy};
+        for (int blockY = 0; blockY < p1; ++blockY) {
+            for (int blockX = 0; blockX < p2; ++blockX) {
+                int srcCoords[2] = {blockY, blockX};
                 int srcRank;
                 MPI_Cart_rank(gridComm, srcCoords, &srcRank);
 
@@ -167,7 +168,7 @@ void gatherC(std::vector<double>& C, const std::vector<double>& Cloc,
                 MPI_Recv(tmp.data(), localRows * localCols, MPI_DOUBLE, srcRank, 300,
                          gridComm, MPI_STATUS_IGNORE);
 
-                placeBlock(C, tmp, rx, cy, localRows, localCols, N);
+                placeBlock(C, tmp, blockY, blockX, localRows, localCols, N);
             }
         }
     } else {
@@ -225,6 +226,9 @@ int main(int argc, char** argv) {
         fillOnes(B);
     }
 
+    MPI_Barrier(gridComm);
+    double t0 = MPI_Wtime();
+
     std::vector<double> ARow(localRows * N);
     std::vector<double> BCol(N * localCols);
     std::vector<double> Cloc(localRows * localCols, 0.0);
@@ -234,10 +238,9 @@ int main(int argc, char** argv) {
 
     broadcastStripes(ARow, BCol, localRows, localCols, N, rowComm, colComm);
 
-    MPI_Barrier(gridComm);
-    double t0 = MPI_Wtime();
-
     multiplyLocal(ARow, BCol, Cloc, localRows, localCols, N);
+
+    gatherC(C, Cloc, localRows, localCols, N, rank, p1, p2, gridComm);
 
     MPI_Barrier(gridComm);
     double t1 = MPI_Wtime();
@@ -245,8 +248,6 @@ int main(int argc, char** argv) {
     double localTime = t1 - t0;
     double maxTime = 0.0;
     MPI_Reduce(&localTime, &maxTime, 1, MPI_DOUBLE, MPI_MAX, 0, gridComm);
-
-    gatherC(C, Cloc, localRows, localCols, N, rank, p1, p2, gridComm);
 
     if (rank == 0) {
         bool ok = checkResult(C, N);

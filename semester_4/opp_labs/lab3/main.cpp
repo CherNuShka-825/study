@@ -1,4 +1,4 @@
-#include <mpi/mpi.h>
+#include <mpi.h>
 #include <vector>
 #include <iostream>
 #include <iomanip>
@@ -55,9 +55,10 @@ void scatterA(const std::vector<double>& A, std::vector<double>& ARow,
               MPI_Comm gridComm, int x, int y) {
     MPI_Comm col0Comm = MPI_COMM_NULL;
 
-    if (x == 0) {
-        MPI_Comm_split(gridComm, 0, y, &col0Comm);
+    int color = (x == 0) ? 0 : MPI_UNDEFINED;
+    MPI_Comm_split(gridComm, color, y, &col0Comm);
 
+    if (x == 0) {
         const double* sendBuf = A.empty() ? nullptr : A.data();
 
         MPI_Scatter(sendBuf,
@@ -78,19 +79,15 @@ void scatterB(const std::vector<double>& B, std::vector<double>& BCol,
               MPI_Comm gridComm, int x, int y) {
     MPI_Comm row0Comm = MPI_COMM_NULL;
 
-    if (y == 0) {
-        MPI_Comm_split(gridComm, 0, x, &row0Comm);
+    int color = (y == 0) ? 0 : MPI_UNDEFINED;
+    MPI_Comm_split(gridComm, color, x, &row0Comm);
 
+    if (y == 0) {
         MPI_Datatype stripeType;
-        MPI_Type_vector(N,
-                        localCols,
-                        N,
-                        MPI_DOUBLE,
-                        &stripeType);
+        MPI_Type_vector(N, localCols, N, MPI_DOUBLE, &stripeType);
 
         MPI_Datatype resizedStripeType;
-        MPI_Type_create_resized(stripeType,
-                                0,
+        MPI_Type_create_resized(stripeType, 0,
                                 static_cast<MPI_Aint>(localCols) * sizeof(double),
                                 &resizedStripeType);
         MPI_Type_commit(&resizedStripeType);
@@ -136,44 +133,52 @@ void multiplyLocal(const std::vector<double>& Arow,
     }
 }
 
-void placeBlock(std::vector<double>& C, const std::vector<double>& block,
-                int blockRow, int blockCol,
-                int localRows, int localCols, int N) {
-    for (int i = 0; i < localRows; ++i) {
-        for (int j = 0; j < localCols; ++j) {
-            C[idx(blockRow * localRows + i, blockCol * localCols + j, N)] =
-                block[idx(i, j, localCols)];
-        }
-    }
-}
-
 void gatherC(std::vector<double>& C, const std::vector<double>& Cloc,
              int localRows, int localCols, int N,
              int rank, int p1, int p2, MPI_Comm gridComm) {
-    if (rank == 0) {
-        placeBlock(C, Cloc, 0, 0, localRows, localCols, N);
+    MPI_Datatype blockType;
+    MPI_Datatype resizedBlockType;
 
-        std::vector<double> tmp(localRows * localCols);
+    int sizes[2] = {N, N};
+    int subsizes[2] = {localRows, localCols};
+    int starts[2] = {0, 0};
+
+    MPI_Type_create_subarray(2, sizes, subsizes, starts, MPI_ORDER_C,
+                             MPI_DOUBLE, &blockType);
+
+    MPI_Type_create_resized(blockType, 0, sizeof(double), &resizedBlockType);
+    MPI_Type_commit(&resizedBlockType);
+
+    std::vector<int> recvCounts;
+    std::vector<int> displs;
+
+    if (rank == 0) {
+        recvCounts.resize(p1 * p2, 1);
+        displs.resize(p1 * p2);
 
         for (int blockY = 0; blockY < p1; ++blockY) {
             for (int blockX = 0; blockX < p2; ++blockX) {
-                int srcCoords[2] = {blockY, blockX};
+                int coords[2] = {blockY, blockX};
                 int srcRank;
-                MPI_Cart_rank(gridComm, srcCoords, &srcRank);
+                MPI_Cart_rank(gridComm, coords, &srcRank);
 
-                if (srcRank == 0) {
-                    continue;
-                }
-
-                MPI_Recv(tmp.data(), localRows * localCols, MPI_DOUBLE, srcRank, 300,
-                         gridComm, MPI_STATUS_IGNORE);
-
-                placeBlock(C, tmp, blockY, blockX, localRows, localCols, N);
+                displs[srcRank] = blockY * localRows * N + blockX * localCols;
             }
         }
-    } else {
-        MPI_Send(Cloc.data(), localRows * localCols, MPI_DOUBLE, 0, 300, gridComm);
     }
+
+    MPI_Gatherv(Cloc.data(),
+                localRows * localCols,
+                MPI_DOUBLE,
+                rank == 0 ? C.data() : nullptr,
+                rank == 0 ? recvCounts.data() : nullptr,
+                rank == 0 ? displs.data() : nullptr,
+                resizedBlockType,
+                0,
+                gridComm);
+
+    MPI_Type_free(&resizedBlockType);
+    MPI_Type_free(&blockType);
 }
 
 bool checkResult(const std::vector<double>& C, int N) {

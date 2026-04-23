@@ -1,0 +1,2 @@
+https://www.youtube.com/watch?v=LlbiOah8Cgk (inode)
+https://www.youtube.com/watch?v=TQb4LHC4LL8 (жесткие ссылки, символические ссылки, (cp, ln -s, ln))

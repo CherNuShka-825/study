@@ -1,0 +1,27 @@
+Что делает join() “после себя”:
+
+1. дожидается завершения потока;
+2. освобождает системные ресурсы завершённого потока;
+3. делает объект std::thread больше не joinable;
+4. main продолжает выполнение дальше.
+
+-----
+
+rm -rf build
+cmake -S . -B build \
+  -DCMAKE_CXX_COMPILER=mpicxx \
+  -DCMAKE_CXX_FLAGS="-mt_mpi" \
+  -DCMAKE_EXE_LINKER_FLAGS="-mt_mpi"
+
+cmake --build build
+
+----
+
+mpecxx -mpilog -mt_mpi -std=c++17 -O2 -pthread \
+    -Iinclude \
+    main.cpp \
+    src/TaskQueue.cpp \
+    src/TaskGenerator.cpp \
+    src/Statistics.cpp \
+    src/WorkBalancer.cpp \
+    -o lab5_mpe

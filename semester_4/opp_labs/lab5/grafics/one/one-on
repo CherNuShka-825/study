@@ -1,0 +1,84 @@
+balance = on
+scenario = one
+iterations = 20
+tasks = 10000
+base_repeat = 10000
+virtual_slots = 16
+pyramid_height = 8
+min_keep = 2
+
+==============================
+MPI processes = 1
+==============================
+Run 1...
+Run 1: 27.7409 sec; avg_lif: 1; total_load: 2000000000
+
+Run 2...
+Run 2: 27.7974 sec; avg_lif: 1; total_load: 2000000000
+
+Run 3...
+Run 3: 27.695 sec; avg_lif: 1; total_load: 2000000000
+
+BEST for np=1:
+RESULT balance=on scenario=one processes=1 iterations=20 tasks_per_iteration=10000 time=27.695 avg_lif=1 total_tasks_done=200000 total_load=2000000000 checksum=1.33343e+11
+
+==============================
+MPI processes = 2
+==============================
+Run 1...
+Run 1: 13.3768 sec; avg_lif: 1.00129; total_load: 2000000000
+
+Run 2...
+Run 2: 12.8354 sec; avg_lif: 1.03975; total_load: 2000000000
+
+Run 3...
+Run 3: 12.9892 sec; avg_lif: 1.02841; total_load: 2000000000
+
+BEST for np=2:
+RESULT balance=on scenario=one processes=2 iterations=20 tasks_per_iteration=10000 time=12.8354 avg_lif=1.03975 total_tasks_done=200000 total_load=2000000000 checksum=1.33343e+11
+
+==============================
+MPI processes = 4
+==============================
+Run 1...
+Run 1: 6.53874 sec; avg_lif: 1.02866; total_load: 2000000000
+
+Run 2...
+Run 2: 6.50535 sec; avg_lif: 1.02908; total_load: 2000000000
+
+Run 3...
+Run 3: 6.34089 sec; avg_lif: 1.00288; total_load: 2000000000
+
+BEST for np=4:
+RESULT balance=on scenario=one processes=4 iterations=20 tasks_per_iteration=10000 time=6.34089 avg_lif=1.00288 total_tasks_done=200000 total_load=2000000000 checksum=1.33343e+11
+
+==============================
+MPI processes = 8
+==============================
+Run 1...
+Run 1: 6.97249 sec; avg_lif: 1.09692; total_load: 2000000000
+
+Run 2...
+Run 2: 7.16963 sec; avg_lif: 1.12104; total_load: 2000000000
+
+Run 3...
+Run 3: 6.9824 sec; avg_lif: 1.1062; total_load: 2000000000
+
+BEST for np=8:
+RESULT balance=on scenario=one processes=8 iterations=20 tasks_per_iteration=10000 time=6.97249 avg_lif=1.09692 total_tasks_done=200000 total_load=2000000000 checksum=1.33343e+11
+
+==============================
+MPI processes = 16
+==============================
+Run 1...
+Run 1: 4.5174 sec; avg_lif: 1.37952; total_load: 2000000000
+
+Run 2...
+Run 2: 4.64602 sec; avg_lif: 1.36712; total_load: 2000000000
+
+Run 3...
+Run 3: 4.65988 sec; avg_lif: 1.35856; total_load: 2000000000
+
+BEST for np=16:
+RESULT balance=on scenario=one processes=16 iterations=20 tasks_per_iteration=10000 time=4.5174 avg_lif=1.37952 total_tasks_done=200000 total_load=2000000000 checksum=1.33343e+11
+

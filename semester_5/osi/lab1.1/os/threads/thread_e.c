@@ -1,5 +1,4 @@
 #define _GNU_SOURCE
-#include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
@@ -11,7 +10,7 @@ const int global_const = 5;
 
 void *mythread(void *arg) {
   printf("mythread [%d %d %d %lu]: Hello from mythread!\n", getpid(), getppid(),
-         gettid(), pthread_self());
+         gettid(), (long unsigned int)pthread_self());
   int local = 1;
   static int static_local = 2;
   const int const_local = 3;
@@ -26,7 +25,7 @@ void *mythread(void *arg) {
 
 int main() {
   printf("main [%d %d %d %lu]: Hello from main!\n", getpid(), getppid(),
-         gettid(), pthread_self());
+         gettid(), (long unsigned int)pthread_self());
   pthread_t tid[5];
   int err;
   for (int i = 0; i < 5; i++) {

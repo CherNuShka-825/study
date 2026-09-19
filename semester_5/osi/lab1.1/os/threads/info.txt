@@ -1,0 +1,27 @@
+pthread_exit(NULL);
+CLONE_VM | CLONE_THREAD | CLONE_FILES
+минимальная еденица диспечеризации
+
+__clone_internal(&args, &start_thread, pd)
+__libc_start_main()
+
+musl-gcc
+
+pthread_attr_t attr;
+pthread_attr_init(&attr);
+pthread_attr_setdetachstate(
+    &attr,
+    PTHREAD_CREATE_DETACHED
+);
+pthread_create(&tid, &attr, worker, NULL);
+pthread_attr_destroy(&attr);
+
+pthread_detach(tid);
+можно делать после завершения потока, тогда просто будет отказ от получения результата и поток почистится.
+
+
+join позволяет завершить поток
+
+
+tls - thread local storage
+_Thread_local int x;

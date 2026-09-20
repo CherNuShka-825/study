@@ -1,13 +1,20 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"net"
 	"net/netip"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
+
+	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 )
 
 const (
@@ -56,27 +63,68 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to listen multicast UDP: %v\n", err)
 		os.Exit(1)
 	}
-	defer func() {
-		if err := conn.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to close UDP connection: %v\n", err)
+
+	if groupIP.Is4() {
+		packetConn := ipv4.NewPacketConn(conn)
+
+		if err := packetConn.SetMulticastLoopback(true); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to enable multicast loopback: %v\n", err)
+			os.Exit(1)
 		}
-	}()
+	} else {
+		packetConn := ipv6.NewPacketConn(conn)
+
+		if err := packetConn.SetMulticastLoopback(true); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to enable multicast loopback: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+	defer stop()
 
 	peers := NewPeerStore()
 
-	go receiveLoop(conn, peers, instanceID)
-	go heartbeatLoop(conn, groupAddr, instanceID)
-	go cleanupLoop(peers)
+	var wg sync.WaitGroup
+	wg.Add(3)
 
-	select {}
+	go func() {
+		defer wg.Done()
+		receiveLoop(ctx, conn, peers, instanceID)
+	}()
+
+	go func() {
+		defer wg.Done()
+		heartbeatLoop(ctx, conn, groupAddr, instanceID)
+	}()
+
+	go func() {
+		defer wg.Done()
+		cleanupLoop(ctx, peers)
+	}()
+
+	<-ctx.Done()
+
+	err = conn.Close()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed close multicast UDP listener: %v\n", err)
+		os.Exit(1)
+	}
+
+	wg.Wait()
 }
 
 func generateInstanceID() (string, error) {
-	bytes := make([]byte, 16)
+	data := make([]byte, 16)
 
-	if _, err := rand.Read(bytes); err != nil {
+	_, err := rand.Read(data)
+	if err != nil {
 		return "", err
 	}
 
-	return hex.EncodeToString(bytes), nil
+	return hex.EncodeToString(data), nil
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"sync"
@@ -63,16 +64,10 @@ func (s *PeerStore) RemoveExpired(
 }
 
 func (s *PeerStore) aliveIPs() []string {
-	unique := make(map[string]struct{})
+	ips := make([]string, 0, len(s.peers))
 
 	for _, peer := range s.peers {
-		unique[peer.IP] = struct{}{}
-	}
-
-	ips := make([]string, 0, len(unique))
-
-	for ip := range unique {
-		ips = append(ips, ip)
+		ips = append(ips, peer.IP)
 	}
 
 	sort.Strings(ips)
@@ -107,15 +102,27 @@ func printAlive(ips []string) {
 	}
 }
 
-func cleanupLoop(peers *PeerStore) {
+func cleanupLoop(
+	ctx context.Context,
+	peers *PeerStore,
+) {
 	ticker := time.NewTicker(cleanupInterval)
 	defer ticker.Stop()
 
-	for now := range ticker.C {
-		aliveIPs, changed := peers.RemoveExpired(now, peerTimeout)
+	for {
+		select {
+		case <-ctx.Done():
+			return
 
-		if changed {
-			printAlive(aliveIPs)
+		case now := <-ticker.C:
+			aliveIPs, changed := peers.RemoveExpired(
+				now,
+				peerTimeout,
+			)
+
+			if changed {
+				printAlive(aliveIPs)
+			}
 		}
 	}
 }

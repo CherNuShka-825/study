@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -14,6 +15,7 @@ const (
 )
 
 func receiveLoop(
+	ctx context.Context,
 	conn *net.UDPConn,
 	peers *PeerStore,
 	instanceID string,
@@ -23,6 +25,9 @@ func receiveLoop(
 	for {
 		n, sender, err := conn.ReadFromUDP(buf)
 		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
 			fmt.Fprintf(os.Stderr, "failed to read UDP packet: %v\n", err)
 			return
 		}
@@ -49,6 +54,7 @@ func receiveLoop(
 }
 
 func heartbeatLoop(
+	ctx context.Context,
 	conn *net.UDPConn,
 	groupAddr *net.UDPAddr,
 	instanceID string,
@@ -59,29 +65,29 @@ func heartbeatLoop(
 	message := []byte(cutMessege + " " + instanceID)
 
 	for {
-		_, err := conn.WriteToUDP(message, groupAddr)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to send heartbeat: %v\n", err)
+		select {
+		case <-ctx.Done():
 			return
-		}
 
-		<-ticker.C
+		case <-ticker.C:
+			_, err := conn.WriteToUDP(message, groupAddr)
+			if err != nil {
+				if ctx.Err() != nil {
+					return
+				}
+
+				fmt.Fprintf(os.Stderr, "failed to send heartbeat: %v\n", err)
+				return
+			}
+		}
 	}
 }
 
 func parseAliveMessage(data []byte) (string, bool) {
 	message := string(data)
-
 	messageType, instanceID, found := strings.Cut(message, " ")
-	if !found {
-		return "", false
-	}
 
-	if messageType != cutMessege {
-		return "", false
-	}
-
-	if instanceID == "" {
+	if !found || messageType != cutMessege || instanceID == "" {
 		return "", false
 	}
 

@@ -1,0 +1,43 @@
+ASCII = range(128)
+EPS: None = None
+
+TOKEN_SPECS: list[tuple[str, str, bool]] = [
+    ("FUNCTION", "function", False),
+    ("RETURNS", "returns", False),
+    ("WHILE", "while", False),
+    ("IF", "if", False),
+    ("ELSE", "else", False),
+    ("ASSERT", "assert", False),
+    ("ASSUME", "assume", False),
+    ("INVARIANT", "invariant", False),
+    ("LENGTH", "length", False),
+    ("COMMENT", "//[^\\r\\n]*", True),
+    ("WS", "[ \\t\\r\\n]+", True),
+    ("TRUE", "true", False),
+    ("FALSE", "false", False),
+    ("OR", "or", False),
+    ("AND", "and", False),
+    ("NOT", "not", False),
+    ("IDENT", "[A-Za-z_][A-Za-z0-9_]*", False),
+    ("INT", "0|[1-9][0-9]*", False),
+    ("EQ", "==", False),
+    ("NE", "!=", False),
+    ("LE", "<=", False),
+    ("GE", ">=", False),
+    ("LT", "<", False),
+    ("GT", ">", False),
+    ("ASSIGN", "=", False),
+    ("PLUS", "\\+", False),
+    ("MINUS", "-", False),
+    ("STAR", "\\*", False),
+    ("SLASH", "/", False),
+    ("LPAREN", "\\(", False),
+    ("RPAREN", "\\)", False),
+    ("LBRACKET", "\\[", False),
+    ("RBRACKET", "\\]", False),
+    ("LBRACE", "\\{", False),
+    ("RBRACE", "\\}", False),
+    ("COMMA", ",", False),
+]
+
+# todo true false uses or and

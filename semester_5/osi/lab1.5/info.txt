@@ -1,0 +1,3 @@
+CLONE_SIGHAND
+man 3 sigsetops - must be
+man 2 sigaction - в конце пример инициализации

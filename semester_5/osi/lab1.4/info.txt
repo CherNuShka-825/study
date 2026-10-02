@@ -1,0 +1,4 @@
+pthread_cleanup_pop(1) - достает и выполняет, а 0 только достает
+cancel state: PTHREAD_CANCEL_ENABLE PTHREAD_CANCEL_DISABLE
+cancel type: PTHREAD_CANCEL_DEFERRED(отложенная) PTHREAD_CANCEL_ASYNCHRONOUS(ассинхронная)
+cancellation point

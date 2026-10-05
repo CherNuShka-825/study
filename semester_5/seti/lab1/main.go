@@ -25,20 +25,24 @@ const (
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintf(os.Stderr, "expected ipv4 or ipv6")
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+}
+
+func run() error {
+	if len(os.Args) != 2 {
+		return fmt.Errorf("expected ipv4 or ipv6")
 	}
 
 	groupIP, err := netip.ParseAddr(os.Args[1])
 	if err != nil {
-		fmt.Fprint(os.Stderr, "invalid IP")
-		os.Exit(1)
+		return fmt.Errorf("invalid IP: %w", err)
 	}
 
 	if !groupIP.IsMulticast() {
-		fmt.Fprint(os.Stderr, "ip is not multicast")
-		os.Exit(1)
+		return fmt.Errorf("ip is not multicast")
 	}
 
 	var network string
@@ -54,29 +58,27 @@ func main() {
 
 	instanceID, err := generateInstanceID()
 	if err != nil {
-		fmt.Fprint(os.Stderr, "failed to generate instance ID")
-		os.Exit(1)
+		return fmt.Errorf("failed to generate instance ID: %w", err)
 	}
 
 	conn, err := net.ListenMulticastUDP(network, nil, groupAddr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to listen multicast UDP: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to listen multicast UDP: %w", err)
 	}
 
 	if groupIP.Is4() {
 		packetConn := ipv4.NewPacketConn(conn)
 
 		if err := packetConn.SetMulticastLoopback(true); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to enable multicast loopback: %v\n", err)
-			os.Exit(1)
+			conn.Close()
+			return fmt.Errorf("failed to enable multicast loopback: %w", err)
 		}
 	} else {
 		packetConn := ipv6.NewPacketConn(conn)
 
 		if err := packetConn.SetMulticastLoopback(true); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to enable multicast loopback: %v\n", err)
-			os.Exit(1)
+			conn.Close()
+			return fmt.Errorf("failed to enable multicast loopback: %w", err)
 		}
 	}
 
@@ -109,13 +111,15 @@ func main() {
 
 	<-ctx.Done()
 
-	err = conn.Close()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed close multicast UDP listener: %v\n", err)
-		os.Exit(1)
-	}
+	closeErr := conn.Close()
 
 	wg.Wait()
+
+	if closeErr != nil {
+		return fmt.Errorf("failed to close multicast UDP listener: %w", closeErr)
+	}
+
+	return nil
 }
 
 func generateInstanceID() (string, error) {

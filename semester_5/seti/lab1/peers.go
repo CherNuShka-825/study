@@ -18,6 +18,11 @@ type PeerStore struct {
 	peers map[string]Peer
 }
 
+type AlivePeer struct {
+	InstanceID string
+	IP         string
+}
+
 func NewPeerStore() *PeerStore {
 	return &PeerStore{
 		peers: make(map[string]Peer),
@@ -28,83 +33,94 @@ func (s *PeerStore) Seen(
 	instanceID string,
 	ip string,
 	now time.Time,
-) ([]string, bool) {
+) ([]AlivePeer, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	before := s.aliveIPs()
 
-	if _, exist := s.peers[instanceID]; !exist {
-		if len(s.peers) >= maxPeers {
-			return before, false
-		}
+	peer, exists := s.peers[instanceID]
+
+	if !exists && len(s.peers) >= maxPeers {
+		return s.alivePeers(), false
 	}
+
+	changed := !exists || peer.IP != ip
 
 	s.peers[instanceID] = Peer{
 		IP:       ip,
 		LastSeen: now,
 	}
 
-	after := s.aliveIPs()
-
-	return after, !sameIPs(before, after)
+	return s.alivePeers(), changed
 }
 
 func (s *PeerStore) RemoveExpired(
 	now time.Time,
 	timeout time.Duration,
-) ([]string, bool) {
+) ([]AlivePeer, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	before := s.aliveIPs()
+	changed := false
 
 	for instanceID, peer := range s.peers {
 		if now.Sub(peer.LastSeen) > timeout {
-			delete(s.peers, instanceID)
+			s.remove(instanceID)
+			changed = true
 		}
 	}
 
-	after := s.aliveIPs()
-
-	return after, !sameIPs(before, after)
+	return s.alivePeers(), changed
 }
 
-func (s *PeerStore) aliveIPs() []string {
-	ips := make([]string, 0, len(s.peers))
+func (s *PeerStore) Remove(instanceID string) ([]AlivePeer, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	for _, peer := range s.peers {
-		ips = append(ips, peer.IP)
-	}
+	changed := s.remove(instanceID)
 
-	sort.Strings(ips)
-
-	return ips
+	return s.alivePeers(), changed
 }
 
-func sameIPs(a, b []string) bool {
-	if len(a) != len(b) {
+func (s *PeerStore) remove(instanceID string) bool {
+	if _, exists := s.peers[instanceID]; !exists {
 		return false
 	}
 
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-
+	delete(s.peers, instanceID)
 	return true
 }
 
-func printAlive(ips []string) {
+func (s *PeerStore) alivePeers() []AlivePeer {
+	peers := make([]AlivePeer, 0, len(s.peers))
+
+	for instanceID, peer := range s.peers {
+		peers = append(peers, AlivePeer{
+			InstanceID: instanceID,
+			IP:         peer.IP,
+		})
+	}
+
+	sort.Slice(peers, func(i, j int) bool {
+		if peers[i].IP == peers[j].IP {
+			return peers[i].InstanceID < peers[j].InstanceID
+		}
+
+		return peers[i].IP < peers[j].IP
+	})
+
+	return peers
+}
+
+func printAlive(peers []AlivePeer) {
 	fmt.Println("Alive copies:")
 
-	if len(ips) == 0 {
+	if len(peers) == 0 {
 		fmt.Println("none")
 		return
 	}
 
-	for _, ip := range ips {
-		fmt.Println(ip)
+	for _, peer := range peers {
+		fmt.Printf("%s %s\n", peer.IP, peer.InstanceID)
 	}
 }
 
@@ -121,13 +137,13 @@ func cleanupLoop(
 			return
 
 		case now := <-ticker.C:
-			aliveIPs, changed := peers.RemoveExpired(
+			alivePeers, changed := peers.RemoveExpired(
 				now,
 				peerTimeout,
 			)
 
 			if changed {
-				printAlive(aliveIPs)
+				printAlive(alivePeers)
 			}
 		}
 	}

@@ -5,14 +5,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"time"
 )
 
 const (
-	bufSize    = 6767
-	cutMessege = "AMOGUS"
+	bufSize      = 6767
+	aliveMessage = "AMOGUS"
+	byeMessage   = "BYE"
 )
 
 func receiveLoop(
@@ -20,20 +20,20 @@ func receiveLoop(
 	conn *net.UDPConn,
 	peers *PeerStore,
 	instanceID string,
-) {
+) error {
 	buf := make([]byte, bufSize)
 
 	for {
 		n, sender, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			if ctx.Err() != nil {
-				return
+				return nil
 			}
-			fmt.Fprintf(os.Stderr, "failed to read UDP packet: %v\n", err)
-			return
+
+			return fmt.Errorf("failed to read UDP packet: %w", err)
 		}
 
-		receivedID, ok := parseAliveMessage(buf[:n])
+		messageType, receivedID, ok := parseMessage(buf[:n])
 		if !ok {
 			continue
 		}
@@ -42,14 +42,23 @@ func receiveLoop(
 			continue
 		}
 
-		aliveIPs, changed := peers.Seen(
-			receivedID,
-			sender.IP.String(),
-			time.Now(),
-		)
+		var alivePeers []AlivePeer
+		var changed bool
+
+		switch messageType {
+		case aliveMessage:
+			alivePeers, changed = peers.Seen(
+				receivedID,
+				sender.IP.String(),
+				time.Now(),
+			)
+
+		case byeMessage:
+			alivePeers, changed = peers.Remove(receivedID)
+		}
 
 		if changed {
-			printAlive(aliveIPs)
+			printAlive(alivePeers)
 		}
 	}
 }
@@ -63,36 +72,41 @@ func heartbeatLoop(
 	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
 
-	message := []byte(cutMessege + " " + instanceID)
+	alive := []byte(aliveMessage + " " + instanceID)
+	bye := []byte(byeMessage + " " + instanceID)
 
 	for {
+		if _, err := conn.WriteToUDP(alive, groupAddr); err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+
+			return fmt.Errorf("failed to send heartbeat: %w", err)
+		}
+
 		select {
 		case <-ctx.Done():
+			if _, err := conn.WriteToUDP(bye, groupAddr); err != nil {
+				return fmt.Errorf("failed to send BYE: %w", err)
+			}
+
 			return nil
 
 		case <-ticker.C:
-			_, err := conn.WriteToUDP(message, groupAddr)
-			if err != nil {
-				if ctx.Err() != nil {
-					return nil
-				}
-
-				return fmt.Errorf("failed to send heartbeat: %w", err)
-			}
 		}
 	}
 }
 
-func parseAliveMessage(data []byte) (string, bool) {
-	message := string(data)
-	messageType, instanceID, found := strings.Cut(message, " ")
+func parseMessage(data []byte) (string, string, bool) {
+	messageType, instanceID, found := strings.Cut(string(data), " ")
 
 	if !found ||
-		messageType != cutMessege || instanceID == "" || !validInstanceID(instanceID) {
-		return "", false
+		(messageType != aliveMessage && messageType != byeMessage) ||
+		!validInstanceID(instanceID) {
+		return "", "", false
 	}
 
-	return instanceID, true
+	return messageType, instanceID, true
 }
 
 func validInstanceID(id string) bool {

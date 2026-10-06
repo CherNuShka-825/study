@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"os"
@@ -58,7 +59,7 @@ func heartbeatLoop(
 	conn *net.UDPConn,
 	groupAddr *net.UDPAddr,
 	instanceID string,
-) {
+) error {
 	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
 
@@ -67,17 +68,16 @@ func heartbeatLoop(
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 
 		case <-ticker.C:
 			_, err := conn.WriteToUDP(message, groupAddr)
 			if err != nil {
 				if ctx.Err() != nil {
-					return
+					return nil
 				}
 
-				fmt.Fprintf(os.Stderr, "failed to send heartbeat: %v\n", err)
-				return
+				return fmt.Errorf("failed to send heartbeat: %w", err)
 			}
 		}
 	}
@@ -87,9 +87,19 @@ func parseAliveMessage(data []byte) (string, bool) {
 	message := string(data)
 	messageType, instanceID, found := strings.Cut(message, " ")
 
-	if !found || messageType != cutMessege || instanceID == "" {
+	if !found ||
+		messageType != cutMessege || instanceID == "" || !validInstanceID(instanceID) {
 		return "", false
 	}
 
 	return instanceID, true
+}
+
+func validInstanceID(id string) bool {
+	if len(id) != 32 {
+		return false
+	}
+
+	_, err := hex.DecodeString(id)
+	return err == nil
 }

@@ -33,6 +33,12 @@ func (s *PeerStore) Seen(
 	defer s.mu.Unlock()
 	before := s.aliveIPs()
 
+	if _, exist := s.peers[instanceID]; !exist {
+		if len(s.peers) >= maxPeers {
+			return before, false
+		}
+	}
+
 	s.peers[instanceID] = Peer{
 		IP:       ip,
 		LastSeen: now,

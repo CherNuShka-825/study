@@ -22,6 +22,7 @@ const (
 	heartbeatInterval = 1 * time.Second
 	peerTimeout       = 3 * time.Second
 	cleanupInterval   = 500 * time.Millisecond
+	maxPeers          = 1024
 )
 
 func main() {
@@ -88,6 +89,8 @@ func run() error {
 	var wg sync.WaitGroup
 	wg.Add(3)
 
+	errCh := make(chan error, 1)
+
 	go func() {
 		defer wg.Done()
 		receiveLoop(ctx, conn, peers, instanceID)
@@ -95,7 +98,12 @@ func run() error {
 
 	go func() {
 		defer wg.Done()
-		heartbeatLoop(ctx, conn, groupAddr, instanceID)
+		if err := heartbeatLoop(ctx, conn, groupAddr, instanceID); err != nil {
+			select {
+			case errCh <- err:
+			default:
+			}
+		}
 	}()
 
 	go func() {
@@ -103,11 +111,21 @@ func run() error {
 		cleanupLoop(ctx, peers)
 	}()
 
-	<-ctx.Done()
+	var runErr error
+
+	select {
+	case <-ctx.Done():
+	case runErr = <-errCh:
+		stop()
+	}
 
 	closeErr := conn.Close()
 
 	wg.Wait()
+
+	if runErr != nil {
+		return runErr
+	}
 
 	if closeErr != nil {
 		return fmt.Errorf("failed to close multicast UDP listener: %w", closeErr)

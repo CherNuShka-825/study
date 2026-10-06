@@ -7,3 +7,7 @@ ff0e::/16  global
 
 go doc net | grep -i multicast
 grep -R "MulticastTCP" "$(go env GOROOT)/src
+
+IGMP — Internet Group Management Protocol
+MLD — Multicast Listener Discovery
+PIM — Protocol Independent Multicast

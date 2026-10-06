@@ -32,13 +32,18 @@ func main() {
 }
 
 func run() error {
-	if len(os.Args) != 2 {
-		return fmt.Errorf("expected ipv4 or ipv6")
+	if len(os.Args) != 3 {
+		return fmt.Errorf("usage: %s <multicast-address> <interface>", os.Args[0])
 	}
 
 	groupIP, err := netip.ParseAddr(os.Args[1])
 	if err != nil {
 		return fmt.Errorf("invalid IP: %w", err)
+	}
+
+	iface, err := net.InterfaceByName(os.Args[2])
+	if err != nil {
+		return fmt.Errorf("invalid network interface %q: %w", os.Args[2], err)
 	}
 
 	if !groupIP.IsMulticast() {
@@ -61,25 +66,14 @@ func run() error {
 		return fmt.Errorf("failed to generate instance ID: %w", err)
 	}
 
-	conn, err := net.ListenMulticastUDP(network, nil, groupAddr)
+	conn, err := net.ListenMulticastUDP(network, iface, groupAddr)
 	if err != nil {
 		return fmt.Errorf("failed to listen multicast UDP: %w", err)
 	}
 
-	if groupIP.Is4() {
-		packetConn := ipv4.NewPacketConn(conn)
-
-		if err := packetConn.SetMulticastLoopback(true); err != nil {
-			conn.Close()
-			return fmt.Errorf("failed to enable multicast loopback: %w", err)
-		}
-	} else {
-		packetConn := ipv6.NewPacketConn(conn)
-
-		if err := packetConn.SetMulticastLoopback(true); err != nil {
-			conn.Close()
-			return fmt.Errorf("failed to enable multicast loopback: %w", err)
-		}
+	if err := configureMulticastDelivery(conn, iface, groupIP); err != nil {
+		conn.Close()
+		return err
 	}
 
 	ctx, stop := signal.NotifyContext(
@@ -117,6 +111,43 @@ func run() error {
 
 	if closeErr != nil {
 		return fmt.Errorf("failed to close multicast UDP listener: %w", closeErr)
+	}
+
+	return nil
+}
+
+type multicastPacketConn interface {
+	SetMulticastInterface(*net.Interface) error
+	SetMulticastLoopback(bool) error
+}
+
+func configureMulticastDelivery(
+	conn *net.UDPConn,
+	iface *net.Interface,
+	groupIP netip.Addr,
+) error {
+	var packetConn multicastPacketConn
+
+	if groupIP.Is4() {
+		ipv4Conn := ipv4.NewPacketConn(conn)
+		if err := ipv4Conn.SetMulticastTTL(1); err != nil {
+			return fmt.Errorf("failed to set multicast TTL: %w", err)
+		}
+		packetConn = ipv4Conn
+	} else {
+		ipv6Conn := ipv6.NewPacketConn(conn)
+		if err := ipv6Conn.SetMulticastHopLimit(1); err != nil {
+			return fmt.Errorf("failed to set multicast hop limit: %w", err)
+		}
+		packetConn = ipv6Conn
+	}
+
+	if err := packetConn.SetMulticastInterface(iface); err != nil {
+		return fmt.Errorf("failed to set multicast interface: %w", err)
+	}
+
+	if err := packetConn.SetMulticastLoopback(true); err != nil {
+		return fmt.Errorf("failed to enable multicast loopback: %w", err)
 	}
 
 	return nil

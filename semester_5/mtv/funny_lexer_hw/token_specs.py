@@ -18,8 +18,10 @@ TOKEN_SPECS: list[tuple[str, str, bool]] = [
     ("OR", "or", False),
     ("AND", "and", False),
     ("NOT", "not", False),
-    ("IDENT", "[A-Za-z_][A-Za-z0-9_]*", False),
-    ("INT", "0|[1-9][0-9]*", False),
+    # ("IDENT", "[A-Za-z_][A-Za-z0-9_]*", False),
+    ("IDENT", "[A-Za-z_][A-Za-z_0-9]*", False),
+    # ("INT", "0|[1-9][0-9]*", False),
+    ("INT", "0|[1-9][0-9]*|00*", False),
     ("EQ", "==", False),
     ("NE", "!=", False),
     ("LE", "<=", False),
@@ -38,6 +40,7 @@ TOKEN_SPECS: list[tuple[str, str, bool]] = [
     ("LBRACE", "\\{", False),
     ("RBRACE", "\\}", False),
     ("COMMA", ",", False),
+    ("SEMICOLON", ";", False),
 ]
 
 # todo true false uses or and

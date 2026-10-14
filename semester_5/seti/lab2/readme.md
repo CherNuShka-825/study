@@ -18,17 +18,30 @@
 
 ## How to run
   
-### client
+### run client
 
-  usage: go run ./cmd/client \[-host host] \[-port port] <file>
+  ```
+  usage: go run ./cmd/client [-host host] [-port port] <file>
   default host: 127.0.0.1
   default port: 6767
+  ```
 
-  example: go run ./cmd/client -host 127.0.0.1 -port 6767 ./test.txt
+  example:
 
-### server
+  ```
+  go run ./cmd/client -host 127.0.0.1 -port 6767 ./test.txt
+  ```
 
+### run server
+
+  ```
   usage: go run ./cmd/server \[-port PORT]
   default port: 6767
 
-  example: go run ./cmd/server -port 6767
+  ```
+
+  example:
+
+  ```
+  go run ./cmd/server -port 6767
+  ```

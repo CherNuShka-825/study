@@ -4,17 +4,21 @@
 
 ### client
 
+  ```
   Multi-byte integer fields use big-endian byte order.
   | length name: 2 bytes
   | name: N bytes (0 < N <= 4096 B)
   | file size: 8 bytes
   V file data: M bytes (0 <= M <= 1 TB)
+  ```
 
 ### server
 
+  ```
   status: 1 byte
     0x00 - success
     0x01 - failure
+  ```
 
 ## How to run
   
@@ -37,7 +41,6 @@
   ```
   usage: go run ./cmd/server \[-port PORT]
   default port: 6767
-
   ```
 
   example:

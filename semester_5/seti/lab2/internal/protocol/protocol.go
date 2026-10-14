@@ -1,3 +1,4 @@
+// Package protocol for send files
 package protocol
 
 import (

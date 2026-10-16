@@ -24,7 +24,12 @@ int main() {
   sleep(1);
   pthread_cancel(tid);
 
-  err = pthread_join(tid, NULL);
+  void *a;
+
+  err = pthread_join(tid, &a);
+  if (a == PTHREAD_CANCELED) {
+    printf("\n\nfadfadfadsfadsf");
+  }
   if (err) {
     printf("main: pthread_join() failed: %s\n", strerror(err));
     return -1;

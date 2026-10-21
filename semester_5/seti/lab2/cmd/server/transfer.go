@@ -15,6 +15,8 @@ import (
 	"github.com/CherNuShka-825/study/semester_5/seti/internal/protocol"
 )
 
+const baseFileName = "f"
+
 func openUploads(dir string) (*os.Root, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create uploads directory: %w", err)
@@ -167,7 +169,7 @@ func createUniqueFile(uploads *os.Root, filename string) (*os.File, string, erro
 		}
 
 		if currentName == "" {
-			currentName = "f"
+			currentName = baseFileName
 		}
 
 		newFilename := currentName + suffix + currentExt

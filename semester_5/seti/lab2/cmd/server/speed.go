@@ -25,11 +25,11 @@ func reportSpeeds(client string, counter *atomic.Uint64, start time.Time, done <
 		currentSpeed := float64(total-lastBytes) / interval
 		averageSpeed := float64(total) / duration
 		fmt.Printf(
-			"[%s] current: %.2f MiB/s, average: %.2f MiB/s, received: %.2f MiB\n",
+			"[%s] current: %.2f MB/s, average: %.2f MB/s, received: %.2f MB\n",
 			client,
-			currentSpeed/bytesPerMiB,
-			averageSpeed/bytesPerMiB,
-			float64(total)/bytesPerMiB,
+			currentSpeed/bytesPerMB,
+			averageSpeed/bytesPerMB,
+			float64(total)/bytesPerMB,
 		)
 		lastBytes = total
 		lastTime = now

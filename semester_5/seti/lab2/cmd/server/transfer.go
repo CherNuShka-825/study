@@ -8,13 +8,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/CherNuShka-825/study/semester_5/seti/internal/protocol"
 )
 
 func openUploads(dir string) (*os.Root, error) {
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create uploads directory: %w", err)
 	}
 
@@ -48,30 +50,48 @@ func receiveFile(conn net.Conn, uploads *os.Root) (retErr error) {
 	}
 
 	file, savedFilename, err := createUniqueFile(uploads, filename)
+	start := time.Now()
 	if err != nil {
 		return err
 	}
+	clientAddr := conn.RemoteAddr().String()
 	defer func() {
 		if err := file.Close(); err != nil {
 			retErr = errors.Join(retErr, fmt.Errorf("close file: %w", err))
 		}
+
 		if retErr != nil {
 			if err := uploads.Remove(savedFilename); err != nil {
 				retErr = errors.Join(retErr, fmt.Errorf("remove incomplete file: %w", err))
 			}
+			return
 		}
+
+		fmt.Printf(
+			"[%s] file saved: %q (%d bytes), time: %.3f s\n",
+			clientAddr,
+			savedFilename,
+			fileSize,
+			time.Since(start).Seconds(),
+		)
 	}()
+
+	fmt.Printf(
+		"[%s] transfer started: %q (%d bytes)\n",
+		clientAddr,
+		filename,
+		fileSize,
+	)
 
 	counter := &countingReader{
 		reader: reader,
 	}
 	done := make(chan struct{})
 	finished := make(chan struct{})
-	start := time.Now()
 
 	go func() {
 		defer close(finished)
-		reportSpeeds(conn.RemoteAddr().String(), &counter.received, start, done)
+		reportSpeeds(clientAddr, &counter.received, start, done)
 	}()
 	defer func() {
 		close(done)
@@ -88,25 +108,84 @@ func receiveFile(conn net.Conn, uploads *os.Root) (retErr error) {
 	return nil
 }
 
+func truncateUTF8(s string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+
+	if len(s) <= maxBytes {
+		return s
+	}
+
+	end := maxBytes
+
+	for end > 0 && !utf8.RuneStart(s[end]) {
+		end--
+	}
+
+	return s[:end]
+}
+
 func createUniqueFile(uploads *os.Root, filename string) (*os.File, string, error) {
+	var fs syscall.Statfs_t
+
+	if err := syscall.Statfs(uploadsDir, &fs); err != nil {
+		return nil, "", fmt.Errorf("get filesystem info: %w", err)
+	}
+	maxNameBytes := int(fs.Namelen)
+
+	if maxNameBytes <= 0 {
+		return nil, "", fmt.Errorf("invalid filename limit: %d", maxNameBytes)
+	}
+
 	ext := filepath.Ext(filename)
 	if ext == filename {
 		ext = ""
 	}
+
 	name := strings.TrimSuffix(filename, ext)
 
 	for i := range maxFilenameAttempts {
-		newFilename := filename
+		suffix := ""
+
 		if i > 0 {
-			newFilename = fmt.Sprintf("%s_%d%s", name, i, ext)
+			suffix = fmt.Sprintf("_%d", i)
 		}
-		file, err := uploads.OpenFile(newFilename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+
+		available := maxNameBytes - len(suffix)
+
+		if available < 1 {
+			break
+		}
+
+		currentExt := ext
+		currentName := truncateUTF8(name, available-len(currentExt))
+
+		if currentName == "" {
+			currentExt = ""
+			currentName = truncateUTF8(filename, available)
+		}
+
+		if currentName == "" {
+			currentName = "f"
+		}
+
+		newFilename := currentName + suffix + currentExt
+
+		file, err := uploads.OpenFile(
+			newFilename,
+			os.O_WRONLY|os.O_CREATE|os.O_EXCL,
+			0o600,
+		)
+
 		if err == nil {
 			return file, newFilename, nil
 		}
+
 		if !errors.Is(err, os.ErrExist) {
-			return nil, "", fmt.Errorf("create file %s: %w", newFilename, err)
+			return nil, "", fmt.Errorf("create file %q: %w", newFilename, err)
 		}
 	}
-	return nil, "", fmt.Errorf("no available filename for %s", filename)
+
+	return nil, "", fmt.Errorf("no available filename for %q", filename)
 }

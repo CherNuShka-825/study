@@ -17,6 +17,7 @@ import (
 const (
 	connectionTimeout = 5 * time.Second
 	statusTimeout     = 30 * time.Second
+	writeTimeout      = 30 * time.Second
 )
 
 func sendFile(filePath, host string, port int) error {
@@ -56,25 +57,44 @@ func sendFile(filePath, host string, port int) error {
 	}
 
 	address := net.JoinHostPort(host, strconv.Itoa(port))
+	fmt.Printf("[client] connecting to %s\n", address)
 
 	conn, err := net.DialTimeout("tcp", address, connectionTimeout)
 	if err != nil {
 		return fmt.Errorf("connect: %w", err)
 	}
+	fmt.Printf("[client] connected to %s\n", conn.RemoteAddr())
 	defer func() {
 		if err := conn.Close(); err != nil {
 			fmt.Fprintln(os.Stderr, "close connection:", err)
 		}
 	}()
 
-	if err := protocol.WriteHeader(conn, filename, uint64(fileSize)); err != nil {
-		return fmt.Errorf("send file header: %w", err)
+	writer := &timeoutWriter{
+		conn:    conn,
+		timeout: writeTimeout,
 	}
 
-	sent, err := io.CopyN(conn, file, fileSize)
+	if err := protocol.WriteHeader(writer, filename, uint64(fileSize)); err != nil {
+		return fmt.Errorf("send file header: %w", err)
+	}
+	fmt.Printf(
+		"[client] sending file: %q (%d bytes)\n",
+		filename,
+		fileSize,
+	)
+
+	start := time.Now()
+	sent, err := io.CopyN(writer, file, fileSize)
 	if err != nil {
 		return fmt.Errorf("send file (%d/%d bytes): %w", sent, fileSize, err)
 	}
+	elapsed := time.Since(start)
+	fmt.Printf(
+		"[client] sent %d bytes in %.3f seconds\n",
+		sent,
+		elapsed.Seconds(),
+	)
 
 	if err := conn.SetReadDeadline(time.Now().Add(statusTimeout)); err != nil {
 		return fmt.Errorf("set read deadline: %w", err)
@@ -89,7 +109,19 @@ func sendFile(filePath, host string, port int) error {
 		return errors.New("server reported file transfer failure")
 	}
 
-	fmt.Println("file transferred successfully")
+	fmt.Printf("[client] file transferred successfully: %q\n", filename)
 
 	return nil
+}
+
+type timeoutWriter struct {
+	conn    net.Conn
+	timeout time.Duration
+}
+
+func (w *timeoutWriter) Write(p []byte) (int, error) {
+	if err := w.conn.SetWriteDeadline(time.Now().Add(w.timeout)); err != nil {
+		return 0, fmt.Errorf("set write deadline: %w", err)
+	}
+	return w.conn.Write(p)
 }

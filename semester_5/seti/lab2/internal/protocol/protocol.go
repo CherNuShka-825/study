@@ -11,10 +11,10 @@ import (
 
 const (
 	MaxFilenameLength        = 4096
-	MaxFileSize       uint64 = 1 << 40 // 1 TiB
+	MaxFileSize       uint64 = 1_000_000_000_000
 
-	StatusFailure byte = 0
-	StatusSuccess byte = 1
+	StatusFailure byte = 1
+	StatusSuccess byte = 0
 )
 
 var (
@@ -133,13 +133,22 @@ func ReadStatus(r io.Reader) (byte, error) {
 }
 
 func writeFull(w io.Writer, data []byte) error {
-	n, err := w.Write(data)
-	if err != nil {
-		return err
-	}
+	for len(data) > 0 {
+		n, err := w.Write(data)
 
-	if n != len(data) {
-		return io.ErrShortWrite
+		if n < 0 || n > len(data) {
+			return fmt.Errorf("invalid write count: %d", n)
+		}
+
+		data = data[n:]
+
+		if err != nil {
+			return err
+		}
+
+		if n == 0 {
+			return io.ErrShortWrite
+		}
 	}
 
 	return nil

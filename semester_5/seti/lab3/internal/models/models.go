@@ -1,3 +1,5 @@
+// Package models:
+// types for json
 package models
 
 type Point struct {

@@ -1,3 +1,6 @@
+// Package service:
+// func for search locations
+// func for build report
 package service
 
 import (
@@ -92,6 +95,10 @@ func (s *Service) BuildReportAsync(
 
 		go func() {
 			defer wg.Done()
+
+			// if s.API.Keys.OpenTripMap == "" {
+			// 	return
+			// }
 
 			s.loadPlaces(ctx, location.Point, &report, &wg, fail)
 		}()

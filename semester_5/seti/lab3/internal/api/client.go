@@ -1,3 +1,5 @@
+// Package api:
+// functions get recuests
 package api
 
 import (
@@ -101,8 +103,7 @@ func (c *Client) getJSON(
 
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		var urlErr *url.Error
-		if errors.As(err, &urlErr) {
+		if urlErr, ok := errors.AsType[*url.Error](err); ok {
 			err = urlErr.Err
 		}
 

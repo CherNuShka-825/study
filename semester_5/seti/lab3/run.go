@@ -40,6 +40,11 @@ func run() error {
 		return errors.New("API keys are not configured")
 	}
 
+	// if keys.GraphHopper == "" ||
+	// 	keys.OpenWeather == "" {
+	// 	return errors.New("API keys are not configured")
+	// }
+
 	s := service.Service{
 		API: api.New(keys),
 	}

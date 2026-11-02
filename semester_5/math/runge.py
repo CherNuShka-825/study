@@ -58,7 +58,7 @@ for name, method in methods:
     print(f"\nМетод: {name}")
     print(f"{'n':>6} {'S_n':>18} {'Ошибка':>18} {'k':>12}")
 
-    for n in [10, 20, 40, 80]:
+    for n in [10, 20, 40, 100, 200, 400, 1000, 2000, 4000]:
         s_n = method(n)
         error = abs(s_n - exact)
         k = runge_order(method, n)

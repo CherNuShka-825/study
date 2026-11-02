@@ -1,6 +1,4 @@
-// Package service:
-// func for search locations
-// func for build report
+// Package service
 package service
 
 import (
@@ -12,7 +10,7 @@ import (
 	"github.com/CherNuShka-825/study/semester_5/seti/lab3/internal/models"
 )
 
-const maxConcurrentDetails = 4
+const maxConcurrentDetails = 2
 
 type Result[T any] struct {
 	Value T
@@ -48,11 +46,21 @@ func (s *Service) SearchLocationsAsync(
 func (s *Service) BuildReportAsync(
 	parent context.Context,
 	location models.Location,
+	radius int,
 ) Future[models.Report] {
 	ch := make(chan Result[models.Report], 1)
 
 	go func() {
 		defer close(ch)
+
+		if radius < 1 || radius > 10000 {
+			ch <- Result[models.Report]{
+				Err: fmt.Errorf(
+					"radius must be between 1 and 10000 meters",
+				),
+			}
+			return
+		}
 
 		ctx, cancel := context.WithCancel(parent)
 		defer cancel()
@@ -96,11 +104,14 @@ func (s *Service) BuildReportAsync(
 		go func() {
 			defer wg.Done()
 
-			// if s.API.Keys.OpenTripMap == "" {
-			// 	return
-			// }
-
-			s.loadPlaces(ctx, location.Point, &report, &wg, fail)
+			s.loadPlaces(
+				ctx,
+				location.Point,
+				radius,
+				&report,
+				&wg,
+				fail,
+			)
 		}()
 
 		wg.Wait()
@@ -121,11 +132,12 @@ func (s *Service) BuildReportAsync(
 func (s *Service) loadPlaces(
 	ctx context.Context,
 	point models.Point,
+	radius int,
 	report *models.Report,
 	wg *sync.WaitGroup,
 	fail func(error),
 ) {
-	places, err := s.API.Places(ctx, point)
+	places, err := s.API.Places(ctx, point, radius)
 	if err != nil {
 		fail(err)
 		return
@@ -141,19 +153,28 @@ func (s *Service) loadPlaces(
 		go func(i int, summary models.PlaceSummary) {
 			defer wg.Done()
 
-			if summary.XID == "" {
-				fail(fmt.Errorf("place %d has empty XID", i+1))
+			if summary.PageID <= 0 {
+				fail(fmt.Errorf(
+					"place %d has invalid PageID",
+					i+1,
+				))
 				return
 			}
 
 			select {
 			case sem <- struct{}{}:
-				defer func() { <-sem }()
+				defer func() {
+					<-sem
+				}()
+
 			case <-ctx.Done():
 				return
 			}
 
-			place, err := s.API.PlaceDetails(ctx, summary)
+			place, err := s.API.PlaceDetails(
+				ctx,
+				summary,
+			)
 			if err != nil {
 				fail(err)
 				return

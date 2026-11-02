@@ -1,5 +1,6 @@
 // Package api:
 // functions get recuests
+
 package api
 
 import (
@@ -17,40 +18,40 @@ import (
 )
 
 const (
-	graphHopperURL       = "https://graphhopper.com/api/1/geocode"
-	openWeatherURL       = "https://api.openweathermap.org/data/2.5/weather"
-	openTripMapRadiusURL = "https://api.opentripmap.com/0.1/ru/places/radius"
-	openTripMapXIDURL    = "https://api.opentripmap.com/0.1/ru/places/xid"
+	graphHopperURL = "https://graphhopper.com/api/1/geocode"
+	openWeatherURL = "https://api.openweathermap.org/data/2.5/weather"
+	wikipediaURL   = "https://ru.wikipedia.org/w/api.php"
 
 	maxResponseSize = 1024 * 1024
+	maxImageSize    = 2 * 1024 * 1024
 
 	geocodeLimit = "5"
 	languageRU   = "ru"
 	weatherUnits = "metric"
-	placesRadius = "3000"
 	placesLimit  = "10"
-	placesFormat = "json"
+	extractChars = "500"
+	thumbSize    = "240"
+
+	maxRadius = 10000
 )
 
 type Keys struct {
-	GraphHopper string
-	OpenWeather string
-	OpenTripMap string
+	GraphHopper        string
+	OpenWeather        string
+	WikipediaUserAgent string
 }
 
 type Endpoints struct {
-	Geocode      string
-	Weather      string
-	PlacesRadius string
-	PlaceByXID   string
+	Geocode   string
+	Weather   string
+	Wikipedia string
 }
 
 func DefaultEndpoints() Endpoints {
 	return Endpoints{
-		Geocode:      graphHopperURL,
-		Weather:      openWeatherURL,
-		PlacesRadius: openTripMapRadiusURL,
-		PlaceByXID:   openTripMapXIDURL,
+		Geocode:   graphHopperURL,
+		Weather:   openWeatherURL,
+		Wikipedia: wikipediaURL,
 	}
 }
 
@@ -63,7 +64,7 @@ type Client struct {
 func New(keys Keys) *Client {
 	return &Client{
 		HTTP: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 12 * time.Second,
 		},
 		Keys:      keys,
 		Endpoints: DefaultEndpoints(),
@@ -101,27 +102,53 @@ func (c *Client) getJSON(
 		return fmt.Errorf("create request: %w", err)
 	}
 
+	if c.Keys.WikipediaUserAgent != "" {
+		req.Header.Set("User-Agent", c.Keys.WikipediaUserAgent)
+	}
+
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
+
 		if urlErr, ok := errors.AsType[*url.Error](err); ok {
 			err = urlErr.Err
 		}
 
-		return fmt.Errorf("request to %s failed: %w", u.Host, err)
+		return fmt.Errorf(
+			"request to %s failed: %w",
+			u.Host,
+			err,
+		)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode < http.StatusOK ||
-		resp.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("request to %s: HTTP %s", u.Host, resp.Status)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf(
+			"request to %s: HTTP %s",
+			u.Host,
+			resp.Status,
+		)
 	}
 
-	decoder := json.NewDecoder(
-		io.LimitReader(resp.Body, maxResponseSize),
+	data, err := io.ReadAll(
+		io.LimitReader(resp.Body, maxResponseSize+1),
 	)
+	if err != nil {
+		return fmt.Errorf("read response: %w", err)
+	}
 
-	if err := decoder.Decode(target); err != nil {
-		return fmt.Errorf("decode JSON from %s: %w", u.Host, err)
+	if len(data) > maxResponseSize {
+		return fmt.Errorf(
+			"response from %s exceeds size limit",
+			u.Host,
+		)
+	}
+
+	if err := json.Unmarshal(data, target); err != nil {
+		return fmt.Errorf(
+			"decode JSON from %s: %w",
+			u.Host,
+			err,
+		)
 	}
 
 	return nil
@@ -195,29 +222,57 @@ func (c *Client) Weather(
 func (c *Client) Places(
 	ctx context.Context,
 	point models.Point,
+	radius int,
 ) ([]models.PlaceSummary, error) {
+	if radius < 1 || radius > maxRadius {
+		return nil, fmt.Errorf(
+			"radius must be between 1 and %d meters",
+			maxRadius,
+		)
+	}
+
 	params := url.Values{}
 
-	coordinates(params, point)
+	coord := strconv.FormatFloat(point.Lat, 'f', -1, 64) +
+		"|" +
+		strconv.FormatFloat(point.Lng, 'f', -1, 64)
 
-	params.Set("radius", placesRadius)
-	params.Set("limit", placesLimit)
-	params.Set("format", placesFormat)
-	params.Set("apikey", c.Keys.OpenTripMap)
+	params.Set("action", "query")
+	params.Set("list", "geosearch")
+	params.Set("gscoord", coord)
+	params.Set("gsradius", strconv.Itoa(radius))
+	params.Set("gslimit", placesLimit)
+	params.Set("format", "json")
+	params.Set("formatversion", "2")
 
-	var places []models.PlaceSummary
+	var response struct {
+		Query struct {
+			Geosearch []models.PlaceSummary `json:"geosearch"`
+		} `json:"query"`
+
+		Error *struct {
+			Info string `json:"info"`
+		} `json:"error"`
+	}
 
 	err := c.getJSON(
 		ctx,
-		c.Endpoints.PlacesRadius,
+		c.Endpoints.Wikipedia,
 		params,
-		&places,
+		&response,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("OpenTripMap places: %w", err)
+		return nil, fmt.Errorf("wikipedia geosearch: %w", err)
 	}
 
-	return places, nil
+	if response.Error != nil {
+		return nil, fmt.Errorf(
+			"wikipedia geosearch: %s",
+			response.Error.Info,
+		)
+	}
+
+	return response.Query.Geosearch, nil
 }
 
 func (c *Client) PlaceDetails(
@@ -225,38 +280,133 @@ func (c *Client) PlaceDetails(
 	summary models.PlaceSummary,
 ) (models.Place, error) {
 	params := url.Values{}
-	params.Set("apikey", c.Keys.OpenTripMap)
 
-	endpoint := c.Endpoints.PlaceByXID +
-		"/" + url.PathEscape(summary.XID)
+	params.Set("action", "query")
+	params.Set("prop", "extracts|pageimages")
+	params.Set("pageids", strconv.Itoa(summary.PageID))
+	params.Set("exintro", "1")
+	params.Set("explaintext", "1")
+	params.Set("exchars", extractChars)
+	params.Set("piprop", "thumbnail")
+	params.Set("pithumbsize", thumbSize)
+	params.Set("format", "json")
+	params.Set("formatversion", "2")
 
-	var place models.Place
+	var response struct {
+		Query struct {
+			Pages []models.Place `json:"pages"`
+		} `json:"query"`
+
+		Error *struct {
+			Info string `json:"info"`
+		} `json:"error"`
+	}
 
 	err := c.getJSON(
 		ctx,
-		endpoint,
+		c.Endpoints.Wikipedia,
 		params,
-		&place,
+		&response,
 	)
 	if err != nil {
-		return place, fmt.Errorf(
-			"OpenTripMap place %s: %w",
-			summary.XID,
+		return models.Place{}, fmt.Errorf(
+			"wikipedia page %d: %w",
+			summary.PageID,
 			err,
 		)
 	}
 
-	if place.XID == "" {
-		place.XID = summary.XID
+	if response.Error != nil {
+		return models.Place{}, fmt.Errorf(
+			"wikipedia page %d: %s",
+			summary.PageID,
+			response.Error.Info,
+		)
+	}
+
+	if len(response.Query.Pages) == 0 {
+		return models.Place{}, fmt.Errorf(
+			"wikipedia page %d not found",
+			summary.PageID,
+		)
+	}
+
+	place := response.Query.Pages[0]
+
+	if place.PageID == 0 {
+		place.PageID = summary.PageID
 	}
 
 	if place.Name == "" {
 		place.Name = summary.Name
 	}
 
-	if place.Kinds == "" {
-		place.Kinds = summary.Kinds
+	if place.Thumbnail.Source != "" {
+		data, err := c.downloadImage(
+			ctx,
+			place.Thumbnail.Source,
+		)
+
+		if err == nil {
+			place.ImageData = data
+		}
 	}
 
 	return place, nil
+}
+
+func (c *Client) downloadImage(
+	ctx context.Context,
+	rawURL string,
+) ([]byte, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, err
+	}
+
+	if u.Scheme != "https" ||
+		u.Hostname() != "upload.wikimedia.org" {
+		return nil, errors.New("invalid image host")
+	}
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		rawURL,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set(
+		"User-Agent",
+		c.Keys.WikipediaUserAgent,
+	)
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf(
+			"image HTTP %s",
+			resp.Status,
+		)
+	}
+
+	data, err := io.ReadAll(
+		io.LimitReader(resp.Body, maxImageSize+1),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(data) > maxImageSize {
+		return nil, errors.New("image is too large")
+	}
+
+	return data, nil
 }

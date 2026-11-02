@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	graphhopperKey = "GRAPHHOPPER_KEY"
-	openweatherKey = "OPENWEATHER_KEY"
-	opentripmapKey = "OPENTRIPMAP_KEY"
+	graphhopperKey     = "GRAPHHOPPER_KEY"
+	openweatherKey     = "OPENWEATHER_KEY"
+	wikipediaUserAgent = "WIKIPEDIA_USER_AGENT"
 )
 
 func run() error {
@@ -29,21 +29,16 @@ func run() error {
 	defer stop()
 
 	keys := api.Keys{
-		GraphHopper: os.Getenv(graphhopperKey),
-		OpenWeather: os.Getenv(openweatherKey),
-		OpenTripMap: os.Getenv(opentripmapKey),
+		GraphHopper:        os.Getenv(graphhopperKey),
+		OpenWeather:        os.Getenv(openweatherKey),
+		WikipediaUserAgent: os.Getenv(wikipediaUserAgent),
 	}
 
 	if keys.GraphHopper == "" ||
 		keys.OpenWeather == "" ||
-		keys.OpenTripMap == "" {
-		return errors.New("API keys are not configured")
+		keys.WikipediaUserAgent == "" {
+		return errors.New("API configuration is missing")
 	}
-
-	// if keys.GraphHopper == "" ||
-	// 	keys.OpenWeather == "" {
-	// 	return errors.New("API keys are not configured")
-	// }
 
 	s := service.Service{
 		API: api.New(keys),
@@ -169,7 +164,8 @@ func printReport(report models.Report) {
 		}
 
 		fmt.Printf("\n%d. %s\n", i+1, name)
-		fmt.Printf("XID: %s\n", place.XID)
+		fmt.Printf("PageID: %d\n", place.PageID)
+		fmt.Printf("Источник: https://ru.wikipedia.org/?curid=%d\n", place.PageID)
 		fmt.Printf("Описание: %s\n", place.Description())
 	}
 }

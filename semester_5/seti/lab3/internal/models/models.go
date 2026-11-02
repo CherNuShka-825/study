@@ -2,6 +2,8 @@
 // types for json
 package models
 
+const hPaToMMHg = 0.750061683
+
 type Point struct {
 	Lat float64 `json:"lat"`
 	Lng float64 `json:"lng"`
@@ -13,6 +15,19 @@ type Location struct {
 	State   string `json:"state"`
 	Country string `json:"country"`
 	Point   Point  `json:"point"`
+
+	OSMKey   string `json:"osm_key"`
+	OSMValue string `json:"osm_value"`
+}
+
+func (l Location) Type() string {
+	if l.OSMKey != "" && l.OSMValue != "" {
+		return l.OSMKey + "=" + l.OSMValue
+	}
+	if l.OSMValue != "" {
+		return l.OSMValue
+	}
+	return "тип не указан"
 }
 
 type GeocodeResponse struct {
@@ -24,39 +39,45 @@ type Weather struct {
 		Temp      float64 `json:"temp"`
 		FeelsLike float64 `json:"feels_like"`
 		Humidity  int     `json:"humidity"`
+		Pressure  int     `json:"pressure"`
 	} `json:"main"`
+
+	Wind struct {
+		Speed float64 `json:"speed"`
+	} `json:"wind"`
 
 	Conditions []struct {
 		Description string `json:"description"`
 	} `json:"weather"`
 }
 
+func (w Weather) PressureMMHg() float64 {
+	return float64(w.Main.Pressure) * hPaToMMHg
+}
+
 type PlaceSummary struct {
-	XID   string `json:"xid"`
-	Name  string `json:"name"`
-	Kinds string `json:"kinds"`
+	PageID   int     `json:"pageid"`
+	Name     string  `json:"title"`
+	Lat      float64 `json:"lat"`
+	Lon      float64 `json:"lon"`
+	Distance float64 `json:"dist"`
 }
 
 type Place struct {
-	XID   string `json:"xid"`
-	Name  string `json:"name"`
-	Kinds string `json:"kinds"`
+	PageID  int    `json:"pageid"`
+	Name    string `json:"title"`
+	Extract string `json:"extract"`
 
-	WikipediaExtracts struct {
-		Text string `json:"text"`
-	} `json:"wikipedia_extracts"`
+	Thumbnail struct {
+		Source string `json:"source"`
+	} `json:"thumbnail"`
 
-	Info struct {
-		Descr string `json:"descr"`
-	} `json:"info"`
+	ImageData []byte `json:"-"`
 }
 
 func (p Place) Description() string {
-	if p.WikipediaExtracts.Text != "" {
-		return p.WikipediaExtracts.Text
-	}
-	if p.Info.Descr != "" {
-		return p.Info.Descr
+	if p.Extract != "" {
+		return p.Extract
 	}
 	return "Описание отсутствует"
 }

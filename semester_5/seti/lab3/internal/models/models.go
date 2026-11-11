@@ -24,9 +24,6 @@ func (l Location) Type() string {
 	if l.OSMKey != "" && l.OSMValue != "" {
 		return l.OSMKey + "=" + l.OSMValue
 	}
-	if l.OSMValue != "" {
-		return l.OSMValue
-	}
 	return "тип не указан"
 }
 
@@ -73,12 +70,18 @@ type Place struct {
 	} `json:"thumbnail"`
 
 	ImageData []byte `json:"-"`
+	LoadError string `json:"-"`
 }
 
 func (p Place) Description() string {
+	if p.LoadError != "" {
+		return "Ошибка загрузки описания: " + p.LoadError
+	}
+
 	if p.Extract != "" {
 		return p.Extract
 	}
+
 	return "Описание отсутствует"
 }
 
@@ -86,4 +89,19 @@ type Report struct {
 	Location Location
 	Weather  Weather
 	Places   []Place
+
+	WeatherError string
+	PlacesError  string
+}
+
+func (r Report) FailedDescriptions() int {
+	count := 0
+
+	for _, place := range r.Places {
+		if place.LoadError != "" {
+			count++
+		}
+	}
+
+	return count
 }

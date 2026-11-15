@@ -12,7 +12,7 @@ import (
 
 const (
 	graphHopperURL = "https://graphhopper.com/api/1/geocode"
-	geocodeLimit   = "5"
+	geocodeLimit   = "10"
 )
 
 func (c *Client) LocationsAsync(ctx context.Context, query string) rxgo.Observable {

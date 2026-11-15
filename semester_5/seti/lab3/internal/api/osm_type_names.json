@@ -35,6 +35,8 @@
   "amenity:toilets": "туалет",
   "amenity:townhall": "администрация",
   "amenity:university": "университет",
+  "highway:residential": "жилая улица",
+  "highway:unclassified": "дорога местного значения",
   "highway:bus_stop": "остановка",
   "historic:archaeological_site": "археологический памятник",
   "historic:castle": "замок",

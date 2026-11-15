@@ -45,7 +45,7 @@ func buildGUI(window fyne.Window, ctx context.Context, s *service.Service) {
 	queryEntry.SetPlaceHolder("Название локации")
 
 	typeEntry := widget.NewEntry()
-	typeEntry.SetPlaceHolder("Например: ")
+	typeEntry.SetPlaceHolder("Тип локации (необязательно)")
 
 	radiusEntry := widget.NewEntry()
 	radiusEntry.SetText(strconv.Itoa(defaultRadius))
@@ -252,7 +252,6 @@ func buildGUI(window fyne.Window, ctx context.Context, s *service.Service) {
 	header := container.NewVBox(
 		widget.NewLabelWithStyle("Поиск локаций", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		queryEntry,
-		widget.NewLabel("Тип локации (необязательно):"),
 		typeEntry,
 		searchButton,
 		widget.NewSeparator(),

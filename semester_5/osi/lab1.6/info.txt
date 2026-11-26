@@ -1,0 +1,11 @@
+gcc -c mythread.c -o mythread.o
+ar rcs libmythread.a mythread.o
+
+gcc main.c libmythread.a -o main_static
+./main_static
+
+gcc -fPIC -c mythread.c -o mythread.o
+gcc -shared mythread.o -o libmythread.so
+
+gcc main.c -L. -lmythread -o main_dynamic
+LD_LIBRARY_PATH=. ./main_dynamic
